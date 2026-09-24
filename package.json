@@ -1,0 +1,51 @@
+{
+  "name": "bangchive-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/with-env.mjs local dev",
+    "build": "npm run typecheck && node scripts/with-env.mjs auto build",
+    "build:development": "npm run typecheck && node scripts/with-env.mjs development build",
+    "build:production": "npm run typecheck && node scripts/with-env.mjs production build",
+    "start": "node scripts/with-env.mjs auto start",
+    "start:development": "node scripts/with-env.mjs development start",
+    "start:production": "node scripts/with-env.mjs production start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.103.2",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.3.2",
+    "lucide-react": "1.47.0",
+    "next": "16.3.5",
+    "radix-ui": "^1.6.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "tw-animate-css": "^1.4.0",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@typescript/native": "npm:typescript@7.0.2",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.5",
+    "prettier": "3.9.8",
+    "shadcn": "4.21.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vitest": "5.0.1"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

@@ -1,0 +1,77 @@
+# Dependencies / caches
+node_modules/
+.pnp.*
+.yarn/
+.npm/
+.pnpm-store/
+.cache/
+.turbo/
+.eslintcache
+.prettiercache
+
+# Build outputs / generated types
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Test outputs (keep test source and configuration)
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+blob-report/
+
+# Environment files / credentials (managed separately in web-config)
+.env
+.env.*
+*.env
+*.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.npmrc
+credentials*.json
+service-account*.json
+secrets/
+
+# Deployment / editor / local agent state
+.vercel/
+.vscode/
+.idea/
+.history/
+.codex/
+.agents/
+.claude/
+.cursor/
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+GEMINI.md
+*.code-workspace
+docs/internal/
+
+# Logs / temporary files / OS metadata
+*.log
+*.log.*
+*.pid
+*.pid.lock
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*~
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep package-lock.json, test sources, app configs and .gitmodules tracked.
+# Do not ignore web-config itself: its gitlink must be tracked after its first commit.
