@@ -1,6 +1,5 @@
-import { ExamViewerPage } from "@/components/exam/exam-viewer-page";
-import { getExam } from "@/lib/exam/service";
+import { ExamCatalogPage } from "@/components/exam/exam-catalog-page";
 
 export default function HomePage() {
-  return <ExamViewerPage examId="knou-cs" initialExam={getExam("knou-cs")} />;
+  return <ExamCatalogPage />;
 }

@@ -25,9 +25,13 @@ export interface ExamStore {
   finishHydration: (failed?: boolean) => void;
   toggleCategory: (category: CategoryId) => void;
   markAnswer: (examId: string, questionId: string, answer: AnswerIndex) => void;
+  clearAnswer: (examId: string, questionId: string) => void;
   setResult: (examId: string, result: GradeResult) => void;
   resetExam: (examId: string) => void;
 }
+
+const PRACTICE_STORAGE_KEY = "knouhow-practice-v1";
+const LEGACY_PRACTICE_STORAGE_KEY = "bangchive-practice-v1";
 
 // 최근 10개 시험만 저장해 로컬 저장소가 무한히 커지는 것을 방지한다.
 function updateSession(
@@ -70,6 +74,26 @@ export function createExamStore(storage?: StateStorage) {
       }
     },
   };
+  const baseStorage = storage ?? browserStorage;
+  const migratedStorage: StateStorage = {
+    getItem: async (name) => {
+      const current = await baseStorage.getItem(name);
+      if (current !== null || name !== PRACTICE_STORAGE_KEY) return current;
+
+      const legacy = await baseStorage.getItem(LEGACY_PRACTICE_STORAGE_KEY);
+      if (legacy === null) return null;
+
+      try {
+        await baseStorage.setItem(name, legacy);
+        await baseStorage.removeItem(LEGACY_PRACTICE_STORAGE_KEY);
+      } catch {
+        // 마이그레이션 저장에 실패해도 기존 답안을 복원한다.
+      }
+      return legacy;
+    },
+    setItem: (name, value) => baseStorage.setItem(name, value),
+    removeItem: (name) => baseStorage.removeItem(name),
+  };
   const store = createStore<ExamStore>()(
     persist(
       (set) => ({
@@ -98,6 +122,17 @@ export function createExamStore(storage?: StateStorage) {
               }),
             };
           }),
+        clearAnswer: (examId, questionId) =>
+          set((state) => {
+            const session = state.sessions[examId];
+            if (!session || session.result || !(questionId in session.answers))
+              return state;
+            const answers = { ...session.answers };
+            delete answers[questionId];
+            return {
+              sessions: updateSession(state.sessions, examId, { answers }),
+            };
+          }),
         setResult: (examId, result) =>
           set((state) => ({
             sessions: updateSession(state.sessions, examId, {
@@ -111,9 +146,9 @@ export function createExamStore(storage?: StateStorage) {
           })),
       }),
       {
-        name: "bangchive-practice-v1",
+        name: PRACTICE_STORAGE_KEY,
         version: 1,
-        storage: createJSONStorage(() => storage ?? browserStorage),
+        storage: createJSONStorage(() => migratedStorage),
         skipHydration: true,
         partialize: ({ selectedCategories, sessions }) => ({
           selectedCategories,

@@ -1,9 +1,9 @@
 {
-  "name": "bangchive-web",
+  "name": "knouhow-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/with-env.mjs local dev",
+    "dev": "node scripts/with-env.mjs local dev --webpack",
     "build": "npm run typecheck && node scripts/with-env.mjs auto build",
     "build:development": "npm run typecheck && node scripts/with-env.mjs development build",
     "build:production": "npm run typecheck && node scripts/with-env.mjs production build",

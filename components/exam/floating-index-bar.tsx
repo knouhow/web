@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Grid2X2,
-  LoaderCircle,
-  RotateCcw,
-  X,
-} from "lucide-react";
+import { ChevronDown, Grid2X2, LoaderCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -39,22 +31,16 @@ export function FloatingIndexBar({
 }: FloatingIndexBarProps) {
   const [expanded, setExpanded] = useState(false);
   const answeredCount = questions.filter(
-    (question) => answers[question.id] !== undefined,
+    (question) => answers[String(question.id)] !== undefined,
   ).length;
-  const remaining = questions.length - answeredCount;
 
   return (
     <aside
-      aria-label="OMR 답안지"
+      aria-label="답안지"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/98 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_#18392e09] backdrop-blur-xl lg:inset-x-auto lg:top-36 lg:right-[max(2rem,calc((100vw-1216px)/2))] lg:bottom-auto lg:w-68 lg:rounded-2xl lg:border lg:p-6 lg:shadow-sm"
     >
       <div className="mb-3 flex items-center justify-between lg:mb-5">
-        <h2 className="text-sm font-bold lg:text-base">
-          나의 답안지{" "}
-          <span className="ml-1.5 font-mono text-[10px] font-normal tracking-wider text-muted-foreground">
-            OMR
-          </span>
-        </h2>
+        <h2 className="text-sm font-bold lg:text-base">답안지</h2>
         <span className="font-mono text-sm">
           <strong className="text-primary">
             {String(answeredCount).padStart(2, "0")}
@@ -64,7 +50,7 @@ export function FloatingIndexBar({
       </div>
       <Progress
         value={(answeredCount / questions.length) * 100}
-        aria-label="답안 작성률"
+        aria-label="문제 풀이 진행률"
         className="mb-4 h-1.5"
       />
       <div
@@ -74,16 +60,18 @@ export function FloatingIndexBar({
         )}
       >
         {questions.map((question, index) => {
-          const answered = answers[question.id] !== undefined;
-          const grade = result?.questions[question.id];
+          const answered = answers[String(question.id)] !== undefined;
+          const grade = result?.questions[String(question.id)];
           const status = grade
-            ? grade.isCorrect
-              ? "정답"
-              : "오답"
+            ? grade.isAnswered
+              ? grade.isCorrect
+                ? "정답"
+                : "오답"
+              : "안 푼 문제"
             : answered
-              ? "응답 완료"
-              : "미응답";
-          const active = activeQuestionId === question.id;
+              ? "푼 문제"
+              : "안 푼 문제";
+          const active = activeQuestionId === String(question.id);
           return (
             <button
               key={question.id}
@@ -100,40 +88,28 @@ export function FloatingIndexBar({
                   ? "border-primary/20 bg-primary/9 text-primary"
                   : "border-border bg-card text-muted-foreground hover:border-primary/40",
                 grade &&
+                  grade.isAnswered &&
                   !grade.isCorrect &&
                   "border-destructive/20 bg-destructive/7 text-destructive",
                 active && "ring-2 ring-primary ring-offset-2",
               )}
             >
               {String(index + 1).padStart(2, "0")}
-              {answered &&
-                (grade && !grade.isCorrect ? (
-                  <X
-                    aria-hidden="true"
-                    className="absolute top-0.5 right-0.5 size-2.5"
-                  />
-                ) : (
-                  <Check
-                    aria-hidden="true"
-                    className="absolute top-0.5 right-0.5 size-2.5"
-                  />
-                ))}
             </button>
           );
         })}
       </div>
       <div className="mb-5 hidden items-center gap-4 text-[11px] text-muted-foreground lg:flex">
         <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm border border-border" />
-          미응답
+          <span className="size-2.5 rounded-sm border border-border" />안 푼
+          문제
         </span>
         <span className="flex items-center gap-1.5">
-          <Check className="size-3 text-primary" />
-          응답 완료
+          <span className="size-2.5 rounded-sm bg-primary" />푼 문제
         </span>
         {result && (
           <span className="flex items-center gap-1">
-            <X className="size-3 text-destructive" />
+            <span className="size-2.5 rounded-sm bg-destructive" />
             오답
           </span>
         )}
@@ -165,27 +141,9 @@ export function FloatingIndexBar({
               다시 풀기
             </>
           ) : (
-            <>
-              답안 제출하고 채점하기
-              <ArrowRight />
-            </>
+            "채점하기"
           )}
         </Button>
-      </div>
-      <p className="mt-3 hidden text-center text-[11px] leading-5 text-muted-foreground lg:block">
-        {result
-          ? `${result.total}문제 중 ${result.correctCount}문제 정답`
-          : remaining > 0
-            ? `아직 ${remaining}문제가 남았어요. 천천히 풀어보세요.`
-            : "모두 풀었어요! 학습 결과를 확인해 보세요."}
-      </p>
-      <div className="mt-6 hidden border-t border-dashed border-border pt-5 lg:block">
-        <p className="text-xs font-semibold">한 문제씩, 합격에 가까이.</p>
-        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-          번호를 누르면 해당 문제로 이동해요.
-          <br />
-          답안은 이 브라우저에 자동 저장돼요.
-        </p>
       </div>
     </aside>
   );

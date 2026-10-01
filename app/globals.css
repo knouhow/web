@@ -51,12 +51,17 @@
   }
   html {
     @apply font-sans;
+    overflow-y: scroll;
     scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
     word-break: keep-all;
     overflow-wrap: anywhere;
+  }
+  html body[data-scroll-locked] {
+    /* html의 고정 스크롤바 공간과 중복되는 Radix 보정 여백을 제거한다. */
+    margin-right: 0 !important;
   }
   button:not(:disabled),
   summary {
