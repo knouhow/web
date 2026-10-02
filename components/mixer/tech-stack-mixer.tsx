@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Shuffle } from "lucide-react";
 import { CategorySelector } from "./category-selector";
 import { RandomMixButton } from "./random-mix-button";
+import { useToast } from "@/components/toast-provider";
 import { examQueryKey, generateMix } from "@/lib/exam/client";
 import { CATEGORIES } from "@/lib/exam/types";
 import { useExamStore } from "@/store/exam-store-provider";
@@ -12,12 +13,20 @@ import { useExamStore } from "@/store/exam-store-provider";
 export function TechStackMixer() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { error, success } = useToast();
   const selected = useExamStore((state) => state.selectedCategories);
   const mix = useMutation({
     mutationFn: generateMix,
     onSuccess: (exam) => {
-      queryClient.setQueryData(examQueryKey(exam.id), exam);
-      router.push(`/exam/${exam.id}`);
+      queryClient.setQueryData(examQueryKey(exam.routeId), exam);
+      success({ title: "문제집을 만들었습니다." });
+      router.push(`/exam/${exam.routeId}`);
+    },
+    onError: (mutationError) => {
+      error({
+        title: "문제집을 만들지 못했습니다.",
+        description: mutationError.message,
+      });
     },
   });
   return (
@@ -27,16 +36,13 @@ export function TechStackMixer() {
     >
       <span className="inline-flex items-center gap-2 rounded-full bg-primary/7 px-3 py-1.5 text-xs font-semibold text-primary">
         <Shuffle className="size-3.5" />
-        CUSTOM TECH STACK MIXER
+        CUSTOM WORKBOOK
       </span>
       <h1 className="mt-5 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
-        배우고 싶은 기술만,
-        <br />
-        <span className="text-primary">나만의 모의고사로.</span>
+        나만의 문제집 만들기
       </h1>
       <p className="mt-4 text-sm leading-7 text-muted-foreground">
-        지금 공부하는 기술을 골라 주세요.
-        <br className="sm:hidden" /> 25문제를 새롭게 섞어 함께 연습해요.
+        카테고리를 선택하세요.
       </p>
       <div className="mt-10 grid gap-7 lg:grid-cols-[1fr_280px]">
         <section>
@@ -50,10 +56,10 @@ export function TechStackMixer() {
           </div>
         </section>
         <aside
-          aria-label="모의고사 구성"
+          aria-label="문제집 구성"
           className="self-start rounded-2xl border border-border bg-card p-6"
         >
-          <h2 className="text-base font-bold">이번 시험 구성</h2>
+          <h2 className="text-base font-bold">이번 문제집 구성</h2>
           <div className="my-5 border-t border-border" />
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">선택한 기술</span>
@@ -92,13 +98,8 @@ export function TechStackMixer() {
             isPending={mix.isPending || mix.isSuccess}
             onGenerate={(categories) => mix.mutate(categories)}
           />
-          {mix.isError && (
-            <p role="alert" className="mt-3 text-xs leading-5 text-destructive">
-              {mix.error.message}
-            </p>
-          )}
           <p className="mt-4 text-center text-[11px] text-muted-foreground">
-            샘플 문제로 바로 시작할 수 있어요.
+            선택한 기술 카테고리에서 문제를 가져옵니다.
           </p>
         </aside>
       </div>

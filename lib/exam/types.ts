@@ -34,34 +34,100 @@ export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export type AnswerIndex = 0 | 1 | 2 | 3;
 export type Choices = readonly [string, string, string, string];
 export type Answers = Record<string, AnswerIndex>;
+export type Term =
+  "FIRST_SEMESTER" | "SECOND_SEMESTER" | "SUMMER_SESSION" | "WINTER_SESSION";
+export type ExplanationStatus =
+  "NONE" | "REQUESTED" | "GENERATING" | "COMPLETED" | "FAILED";
 
 export interface Question {
-  id: string;
-  category: CategoryId;
+  id: number;
+  number: number | null;
+  category: CategoryId | null;
   text: string;
   choices: Choices;
 }
+
 export interface Exam {
-  id: string;
+  routeId: string;
+  id: number | null;
+  subjectCode: string | null;
   title: string;
   kind: "university" | "tech";
+  examYear: number | null;
+  termLabel: string | null;
   questions: Question[];
 }
-export interface QuestionResult {
+
+export interface QuestionSolution {
   correctAnswer: AnswerIndex;
-  isCorrect: boolean;
-  explanation: string;
+  explanation: string | null;
+  explanationStatus: ExplanationStatus;
+  choiceExplanations?: Choices | null;
 }
+
+export interface QuestionResult extends QuestionSolution {
+  selectedAnswer?: AnswerIndex;
+  isAnswered: boolean;
+  isCorrect: boolean;
+}
+
 export interface GradeResult {
   correctCount: number;
+  answeredCount: number;
   total: number;
   score: number;
   questions: Record<string, QuestionResult>;
 }
 
+export interface PastExamRecord {
+  examId: number;
+  examYear: number;
+  term: Term;
+  termLabel: string;
+}
+
+export interface SubjectCatalogItem {
+  id: number;
+  code: string;
+  title: string;
+  department: string;
+  pastExams: PastExamRecord[];
+}
+
+export interface ExamApiResponse {
+  id: number;
+  subjectCode: string;
+  subjectTitle: string;
+  examYear: number;
+  term: Term;
+  termLabel: string;
+  questions: Question[];
+}
+
+export interface GradeApiQuestion {
+  selectedAnswer: AnswerIndex;
+  correctAnswer: AnswerIndex;
+  isCorrect: boolean;
+  explanation: string | null;
+  explanationStatus: ExplanationStatus;
+}
+
+export interface GradeApiResponse {
+  correctCount: number;
+  total: number;
+  score: number;
+  questions: Record<string, GradeApiQuestion>;
+}
+
+export interface ExplanationStatusResponse {
+  questionId: number;
+  status: ExplanationStatus;
+}
+
 export function isCategory(value: unknown): value is CategoryId {
   return CATEGORIES.some((category) => category.id === value);
 }
+
 export function isAnswer(value: unknown): value is AnswerIndex {
   return value === 0 || value === 1 || value === 2 || value === 3;
 }

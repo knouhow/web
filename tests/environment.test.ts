@@ -4,7 +4,7 @@ import { join, relative, isAbsolute } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { prepareEnvironment } from "@/scripts/with-env.mjs";
 
-const directory = mkdtempSync(join(tmpdir(), "bangchive-env-test-"));
+const directory = mkdtempSync(join(tmpdir(), "knouhow-env-test-"));
 mkdirSync(join(directory, "web-config", "config"), { recursive: true });
 for (const stage of ["local", "development", "production"]) {
   writeFileSync(
@@ -18,7 +18,7 @@ afterAll(() => {
   if (
     !isAbsolute(target) &&
     !target.startsWith("..") &&
-    target.startsWith("bangchive-env-test-")
+    target.startsWith("knouhow-env-test-")
   )
     rmSync(directory, { recursive: true, force: true });
 });

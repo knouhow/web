@@ -1,9 +1,9 @@
 {
-  "name": "bangchive-web",
+  "name": "knouhow-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/with-env.mjs local dev",
+    "dev": "node scripts/with-env.mjs local dev --webpack",
     "build": "npm run typecheck && node scripts/with-env.mjs auto build",
     "build:development": "npm run typecheck && node scripts/with-env.mjs development build",
     "build:production": "npm run typecheck && node scripts/with-env.mjs production build",
@@ -18,11 +18,11 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@tanstack/react-query": "5.103.2",
+    "@tanstack/react-query": "5.104.0",
     "class-variance-authority": "^0.7.1",
-    "cn": "^0.3.2",
-    "lucide-react": "1.47.0",
-    "next": "16.3.5",
+    "cn": "^0.4.0",
+    "lucide-react": "1.48.0",
+    "next": "16.3.7",
     "radix-ui": "^1.6.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -33,19 +33,22 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
-    "@types/node": "26.6.2",
+    "@types/node": "26.6.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@typescript/native": "npm:typescript@7.0.2",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.5",
-    "prettier": "3.9.8",
+    "eslint-config-next": "16.3.7",
+    "prettier": "3.9.9",
     "shadcn": "4.21.0",
     "tailwindcss": "4.3.3",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "vitest": "5.0.1"
+    "vitest": "5.0.2"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   }
 }

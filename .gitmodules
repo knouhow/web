@@ -1,5 +1,5 @@
 [submodule "web-config"]
 	path = web-config
-	url = https://github.com/bangchive/api-config.git
+	url = https://github.com/knouhow/web-config.git
 	branch = main
 	update = none
