@@ -28,7 +28,7 @@ export function SiteFooter() {
             서비스 피드백
           </button>
         </nav>
-        <p>© 2026 노하우 / KNOUHow</p>
+        <p>© 2026 KNOUHow</p>
       </div>
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </footer>

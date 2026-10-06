@@ -50,6 +50,7 @@ secrets/
 .claude/
 .cursor/
 AGENTS.md
+!/AGENTS.md
 AGENTS.override.md
 CLAUDE.md
 GEMINI.md

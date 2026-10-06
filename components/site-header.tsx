@@ -103,10 +103,10 @@ export function SiteHeader({ user }: SiteHeaderProps) {
       <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-4 sm:px-8">
         <Link
           href="/"
-          aria-label="노하우 홈"
+          aria-label="KNOUHow 홈"
           className="justify-self-start rounded-md text-base font-extrabold tracking-tight focus-visible:outline-2 focus-visible:outline-primary sm:text-xl"
         >
-          노하우
+          KNOUHow
         </Link>
 
         <nav
