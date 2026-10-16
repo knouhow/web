@@ -1,6 +1,6 @@
 import { apiRequest, isRecordValue } from "@/lib/api-client";
 import {
-  isAnswer,
+  isAnswerForChoiceCount,
   isCategory,
   type Answers,
   type CategoryId,
@@ -12,6 +12,9 @@ import {
   type GradeResult,
   type PastExamRecord,
   type Question,
+  type QuestionImage,
+  type QuestionReportType,
+  type QuestionTable,
   type QuestionSolution,
   type SubjectCatalogItem,
   type Term,
@@ -22,20 +25,21 @@ const LEGACY_MIX_EXAMS_STORAGE_KEY = "bangchive-mix-exams-v1";
 const MIX_EXAM_LIMIT = 10;
 const EXPLANATION_POLL_INTERVAL = 2000;
 const EXPLANATION_POLL_ATTEMPTS = 30;
+export const EXPLANATION_POLL_INTERVAL_MS = EXPLANATION_POLL_INTERVAL;
 
-const TERMS: readonly Term[] = [
+const TERMS = new Set<Term>([
   "FIRST_SEMESTER",
   "SECOND_SEMESTER",
   "SUMMER_SESSION",
   "WINTER_SESSION",
-];
-const EXPLANATION_STATUSES: readonly ExplanationStatus[] = [
+]);
+const EXPLANATION_STATUSES = new Set<ExplanationStatus>([
   "NONE",
   "REQUESTED",
   "GENERATING",
   "COMPLETED",
   "FAILED",
-];
+]);
 
 function requireString(value: unknown, label: string): string {
   if (typeof value !== "string")
@@ -50,7 +54,7 @@ function requireNumber(value: unknown, label: string): number {
 }
 
 function parseTerm(value: unknown): Term {
-  if (typeof value !== "string" || !TERMS.includes(value as Term))
+  if (typeof value !== "string" || !TERMS.has(value as Term))
     throw new Error("시험 학기 형식이 올바르지 않습니다.");
   return value as Term;
 }
@@ -58,20 +62,85 @@ function parseTerm(value: unknown): Term {
 function parseExplanationStatus(value: unknown): ExplanationStatus {
   if (
     typeof value !== "string" ||
-    !EXPLANATION_STATUSES.includes(value as ExplanationStatus)
+    !EXPLANATION_STATUSES.has(value as ExplanationStatus)
   )
     throw new Error("해설 상태 형식이 올바르지 않습니다.");
   return value as ExplanationStatus;
 }
 
-function parseChoices(value: unknown): Choices {
+function parseChoices(value: unknown, expectedCount?: number): Choices {
   if (
     !Array.isArray(value) ||
-    value.length !== 4 ||
+    (value.length !== 2 && value.length !== 4) ||
+    (expectedCount !== undefined && value.length !== expectedCount) ||
     !value.every((choice) => typeof choice === "string")
   )
-    throw new Error("선지 응답은 네 항목이어야 합니다.");
-  return [value[0], value[1], value[2], value[3]];
+    throw new Error("선지 응답 형식이 문항 유형과 일치하지 않습니다.");
+  return value;
+}
+
+function parseQuestionImages(value: unknown): QuestionImage[] {
+  if (!Array.isArray(value))
+    throw new Error("문항 그림 형식이 올바르지 않습니다.");
+  return value.map((image) => {
+    if (!isRecordValue(image))
+      throw new Error("문항 그림 형식이 올바르지 않습니다.");
+    const url = requireString(image.url, "그림 주소");
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      throw new Error("그림 주소 형식이 올바르지 않습니다.");
+    }
+    const width = requireNumber(image.width, "그림 너비");
+    const height = requireNumber(image.height, "그림 높이");
+    const alt = image.alt;
+    const seq = requireNumber(image.seq, "그림 순번");
+    if (
+      !["http:", "https:"].includes(parsedUrl.protocol) ||
+      seq <= 0 ||
+      width <= 0 ||
+      height <= 0 ||
+      (alt !== null && alt !== undefined && typeof alt !== "string")
+    )
+      throw new Error("문항 그림 형식이 올바르지 않습니다.");
+    return {
+      seq,
+      url,
+      width,
+      height,
+      alt: typeof alt === "string" ? alt : null,
+    };
+  });
+}
+
+function parseQuestionTables(value: unknown): QuestionTable[] {
+  if (!Array.isArray(value))
+    throw new Error("문항 표 형식이 올바르지 않습니다.");
+  return value.map((table) => {
+    if (!isRecordValue(table) || !Array.isArray(table.rows))
+      throw new Error("문항 표 형식이 올바르지 않습니다.");
+    const rows = table.rows.map((row) => {
+      if (!Array.isArray(row))
+        throw new Error("문항 표 행 형식이 올바르지 않습니다.");
+      return row.map((cell) => {
+        if (!isRecordValue(cell))
+          throw new Error("문항 표 셀 형식이 올바르지 않습니다.");
+        const rowSpan = requireNumber(cell.rowSpan, "표 셀 행 병합 수");
+        const colSpan = requireNumber(cell.colSpan, "표 셀 열 병합 수");
+        if (rowSpan <= 0 || colSpan <= 0)
+          throw new Error("문항 표 셀 병합 형식이 올바르지 않습니다.");
+        return {
+          text: requireString(cell.text, "표 셀 내용"),
+          rowSpan,
+          colSpan,
+        };
+      });
+    });
+    const seq = requireNumber(table.seq, "표 순번");
+    if (seq <= 0) throw new Error("문항 표 순번 형식이 올바르지 않습니다.");
+    return { seq, rows };
+  });
 }
 
 function parseQuestion(value: unknown): Question {
@@ -88,12 +157,21 @@ function parseQuestion(value: unknown): Question {
     (typeof number !== "number" || !Number.isSafeInteger(number))
   )
     throw new Error("문제 번호 형식이 올바르지 않습니다.");
+  const type = value.type === undefined ? "MULTIPLE_CHOICE" : value.type;
+  if (type !== "MULTIPLE_CHOICE" && type !== "TRUE_FALSE")
+    throw new Error("문제 유형 형식이 올바르지 않습니다.");
+  const choices = parseChoices(value.choices, type === "TRUE_FALSE" ? 2 : 4);
+  if (type === "TRUE_FALSE" && (choices[0] !== "O" || choices[1] !== "X"))
+    throw new Error("O/X 문항 선지는 O, X 순서여야 합니다.");
   return {
     id: requireNumber(value.id, "문제 ID"),
     number,
     category: parsedCategory,
+    type,
     text: requireString(value.text, "문제 본문"),
-    choices: parseChoices(value.choices),
+    choices,
+    images: value.images === undefined ? [] : parseQuestionImages(value.images),
+    tables: value.tables === undefined ? [] : parseQuestionTables(value.tables),
   };
 }
 
@@ -214,82 +292,96 @@ function saveMixExam(exam: Exam) {
   }
 }
 
-function parseGradeQuestion(value: unknown): GradeApiQuestion {
+function parseGradeQuestion(
+  value: unknown,
+  choiceCount: number,
+): GradeApiQuestion {
   if (!isRecordValue(value))
     throw new Error("문항 채점 응답 형식이 올바르지 않습니다.");
-  if (!isAnswer(value.selectedAnswer) || !isAnswer(value.correctAnswer))
+  if (
+    (value.selectedAnswer !== null &&
+      !isAnswerForChoiceCount(value.selectedAnswer, choiceCount)) ||
+    !isAnswerForChoiceCount(value.correctAnswer, choiceCount)
+  )
     throw new Error("채점 선지 형식이 올바르지 않습니다.");
   if (typeof value.isCorrect !== "boolean")
     throw new Error("채점 결과 형식이 올바르지 않습니다.");
   if (value.explanation !== null && typeof value.explanation !== "string")
     throw new Error("해설 형식이 올바르지 않습니다.");
+  const choiceExplanations =
+    value.choiceExplanations == null
+      ? null
+      : parseChoices(value.choiceExplanations, choiceCount);
   return {
     selectedAnswer: value.selectedAnswer,
     correctAnswer: value.correctAnswer,
     isCorrect: value.isCorrect,
     explanation: value.explanation,
     explanationStatus: parseExplanationStatus(value.explanationStatus),
+    choiceExplanations,
   };
 }
 
-function parseGrade(value: unknown): GradeApiResponse {
+function parseGrade(value: unknown, exam: Exam): GradeApiResponse {
   if (!isRecordValue(value) || !isRecordValue(value.questions))
     throw new Error("채점 응답 형식이 올바르지 않습니다.");
+  const choiceCounts = new Map(
+    exam.questions.map((question) => [
+      String(question.id),
+      question.choices.length,
+    ]),
+  );
   return {
     correctCount: requireNumber(value.correctCount, "정답 수"),
+    answeredCount: requireNumber(value.answeredCount, "응답 수"),
     total: requireNumber(value.total, "문제 수"),
     score: requireNumber(value.score, "점수"),
+    maxScore: requireNumber(value.maxScore, "만점"),
     questions: Object.fromEntries(
       Object.entries(value.questions).map(([id, result]) => [
         id,
-        parseGradeQuestion(result),
+        parseGradeQuestion(result, choiceCounts.get(id) ?? 0),
       ]),
     ),
   };
 }
 
-function toGradeResult(
-  exam: Exam,
-  answers: Answers,
-  apiResult: GradeApiResponse,
-): GradeResult {
-  let answeredCount = 0;
-  let correctCount = 0;
+function toGradeResult(exam: Exam, apiResult: GradeApiResponse): GradeResult {
   const questions: GradeResult["questions"] = {};
   for (const question of exam.questions) {
     const questionId = String(question.id);
-    const isAnswered = answers[questionId] !== undefined;
     const graded = apiResult.questions[questionId];
     if (!graded) throw new Error(`문항 ${questionId} 채점 결과가 없습니다.`);
-    if (isAnswered) {
-      answeredCount += 1;
-      if (answers[questionId] === graded.correctAnswer) correctCount += 1;
-    }
+    const isAnswered = graded.selectedAnswer !== null;
     questions[questionId] = {
-      selectedAnswer: isAnswered ? answers[questionId] : undefined,
+      selectedAnswer: graded.selectedAnswer ?? undefined,
       correctAnswer: graded.correctAnswer,
       isAnswered,
-      isCorrect: isAnswered && answers[questionId] === graded.correctAnswer,
+      isCorrect: graded.isCorrect,
       explanation: graded.explanation,
       explanationStatus: graded.explanationStatus,
+      choiceExplanations: graded.choiceExplanations,
     };
   }
   return {
-    correctCount,
-    answeredCount,
+    correctCount: apiResult.correctCount,
+    answeredCount: apiResult.answeredCount,
     total: apiResult.total,
-    score: correctCount * 4,
+    score: apiResult.score,
+    maxScore: apiResult.maxScore,
     questions,
   };
 }
 
-function completeAnswers(exam: Exam, answers: Answers): Answers {
-  return Object.fromEntries(
-    exam.questions.map((question) => {
-      const id = String(question.id);
-      return [id, answers[id] ?? 0];
-    }),
-  );
+function gradeAnswers(exam: Exam, answers: Answers) {
+  const gradeAnswers: Record<string, number | null> = {};
+  for (const question of exam.questions) {
+    const id = String(question.id);
+    if (isAnswerForChoiceCount(answers[id], question.choices.length))
+      gradeAnswers[id] = answers[id];
+    else if (exam.id === null) gradeAnswers[id] = null;
+  }
+  return gradeAnswers;
 }
 
 async function gradeFromApi(
@@ -302,10 +394,10 @@ async function gradeFromApi(
   const value = await apiRequest(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ answers: completeAnswers(exam, answers) }),
+    body: JSON.stringify({ answers: gradeAnswers(exam, answers) }),
     signal,
   });
-  return parseGrade(value);
+  return parseGrade(value, exam);
 }
 
 function waitForExplanation(delay: number, signal: AbortSignal) {
@@ -326,34 +418,6 @@ function waitForExplanation(delay: number, signal: AbortSignal) {
   });
 }
 
-async function loadExplanationStatus(
-  questionId: number,
-  initialStatus: ExplanationStatus,
-  signal: AbortSignal,
-) {
-  let status = initialStatus;
-  if (status === "NONE" || status === "FAILED") {
-    await apiRequest(`/api/questions/${questionId}/explanation`, {
-      method: "POST",
-      signal,
-    });
-    status = "REQUESTED";
-  }
-
-  for (let attempt = 0; attempt < EXPLANATION_POLL_ATTEMPTS; attempt += 1) {
-    if (status === "COMPLETED" || status === "FAILED") return status;
-    await waitForExplanation(EXPLANATION_POLL_INTERVAL, signal);
-    const value = await apiRequest(
-      `/api/questions/${questionId}/explanation/status`,
-      { signal },
-    );
-    if (!isRecordValue(value))
-      throw new Error("해설 상태 응답이 올바르지 않습니다.");
-    status = parseExplanationStatus(value.status);
-  }
-  return status;
-}
-
 function hasPendingExplanation(questions: GradeResult["questions"]) {
   return Object.values(questions).some(
     ({ explanationStatus }) =>
@@ -363,53 +427,50 @@ function hasPendingExplanation(questions: GradeResult["questions"]) {
 
 export async function refreshPendingExplanations(
   exam: Exam,
-  answers: Answers,
   initialResult: GradeResult,
   signal: AbortSignal,
+  attempt = 0,
 ) {
-  let result = initialResult;
-  const hadPendingAtStart = hasPendingExplanation(result.questions);
-  let completedAny = Object.values(result.questions).some(
-    ({ explanationStatus }) => explanationStatus === "COMPLETED",
+  if (
+    attempt >= EXPLANATION_POLL_ATTEMPTS ||
+    !hasPendingExplanation(initialResult.questions)
+  )
+    return initialResult;
+
+  await waitForExplanation(EXPLANATION_POLL_INTERVAL, signal);
+  const pending = Object.entries(initialResult.questions).filter(
+    ([, question]) =>
+      question.explanationStatus === "REQUESTED" ||
+      question.explanationStatus === "GENERATING",
   );
-
-  for (
-    let attempt = 0;
-    attempt < EXPLANATION_POLL_ATTEMPTS &&
-    hasPendingExplanation(result.questions);
-    attempt += 1
-  ) {
-    await waitForExplanation(EXPLANATION_POLL_INTERVAL, signal);
-    const pending = Object.entries(result.questions).filter(
-      ([, question]) =>
-        question.explanationStatus === "REQUESTED" ||
-        question.explanationStatus === "GENERATING",
-    );
-    const statuses = await Promise.all(
-      pending.map(async ([questionId]) => {
-        const id = Number(questionId);
-        const value = await apiRequest(
-          `/api/questions/${id}/explanation/status`,
-          { signal },
-        );
-        if (!isRecordValue(value) || value.questionId !== id)
-          throw new Error("해설 상태 응답이 올바르지 않습니다.");
-        return [questionId, parseExplanationStatus(value.status)] as const;
-      }),
-    );
-    const questions = { ...result.questions };
-    for (const [questionId, explanationStatus] of statuses) {
-      const question = questions[questionId];
-      if (!question) continue;
-      questions[questionId] = { ...question, explanationStatus };
-      if (explanationStatus === "COMPLETED") completedAny = true;
-    }
-    result = { ...result, questions };
+  const solutions = await Promise.all(
+    pending.map(([questionId]) => {
+      const question = exam.questions.find(
+        (item) => String(item.id) === questionId,
+      );
+      if (!question) return Promise.resolve([questionId, null] as const);
+      return fetchQuestionSolution(question, signal).then(
+        (solution) => [questionId, solution] as const,
+      );
+    }),
+  );
+  const questions = { ...initialResult.questions };
+  for (const [questionId, solution] of solutions) {
+    const graded = questions[questionId];
+    if (!graded || !solution) continue;
+    questions[questionId] = {
+      ...graded,
+      explanation: solution.explanation,
+      explanationStatus: solution.explanationStatus,
+      choiceExplanations: solution.choiceExplanations,
+    };
   }
-
-  if (!hadPendingAtStart || !completedAny) return result;
-  const refreshedGrade = await gradeFromApi(exam, answers, signal);
-  return toGradeResult(exam, answers, refreshedGrade);
+  return refreshPendingExplanations(
+    exam,
+    { ...initialResult, questions },
+    signal,
+    attempt + 1,
+  );
 }
 
 export const examQueryKey = (id: string) => ["exam", id] as const;
@@ -437,40 +498,58 @@ export async function fetchExam(routeId: string, signal: AbortSignal) {
 
 export async function submitExam(exam: Exam, answers: Answers) {
   const result = await gradeFromApi(exam, answers);
-  return toGradeResult(exam, answers, result);
+  return toGradeResult(exam, result);
 }
 
 export async function fetchQuestionSolution(
-  exam: Exam,
-  questionId: number,
-  answers: Answers,
+  question: Pick<Question, "id" | "choices">,
   signal: AbortSignal,
 ): Promise<QuestionSolution> {
-  // 임시 연동: 계약에 문항별 정답 API가 생기면 전체 채점 우회 호출을 교체한다.
-  let grade = await gradeFromApi(exam, answers, signal);
-  let question = grade.questions[String(questionId)];
-  if (!question) throw new Error(`문항 ${questionId} 채점 결과가 없습니다.`);
-
-  if (question.explanationStatus !== "COMPLETED") {
-    const status = await loadExplanationStatus(
-      questionId,
-      question.explanationStatus,
-      signal,
-    );
-    if (status === "COMPLETED") {
-      grade = await gradeFromApi(exam, answers, signal);
-      question = grade.questions[String(questionId)];
-      if (!question)
-        throw new Error(`문항 ${questionId} 채점 결과가 없습니다.`);
-    } else {
-      question = { ...question, explanationStatus: status };
-    }
-  }
+  const value = await apiRequest(`/api/questions/${question.id}/solution`, {
+    signal,
+  });
+  if (!isRecordValue(value))
+    throw new Error("정답 및 해설 응답 형식이 올바르지 않습니다.");
+  if (!isAnswerForChoiceCount(value.correctAnswer, question.choices.length))
+    throw new Error("정답 선지 형식이 올바르지 않습니다.");
+  if (value.explanation !== null && typeof value.explanation !== "string")
+    throw new Error("해설 형식이 올바르지 않습니다.");
+  const choiceExplanations =
+    value.choiceExplanations == null
+      ? null
+      : parseChoices(value.choiceExplanations, question.choices.length);
   return {
-    correctAnswer: question.correctAnswer,
-    explanation: question.explanation,
-    explanationStatus: question.explanationStatus,
+    correctAnswer: value.correctAnswer,
+    explanation: value.explanation,
+    explanationStatus: parseExplanationStatus(value.explanationStatus),
+    choiceExplanations,
   };
+}
+
+export async function retryQuestionExplanation(questionId: number) {
+  const value = await apiRequest(`/api/questions/${questionId}/explanation`, {
+    method: "POST",
+  });
+  if (!isRecordValue(value) || value.questionId !== questionId)
+    throw new Error("해설 재요청 응답 형식이 올바르지 않습니다.");
+  const status = parseExplanationStatus(value.status);
+  if (status !== "REQUESTED")
+    throw new Error("해설 재요청 응답 상태가 올바르지 않습니다.");
+}
+
+export async function submitQuestionReport(
+  questionId: number,
+  type: QuestionReportType,
+  content: string,
+) {
+  const trimmedContent = content.trim();
+  return apiRequest(`/api/questions/${questionId}/reports`, {
+    method: "POST",
+    body: JSON.stringify({
+      type,
+      ...(trimmedContent ? { content } : {}),
+    }),
+  });
 }
 
 export async function generateMix(categories: CategoryId[]) {

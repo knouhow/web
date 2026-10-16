@@ -76,7 +76,7 @@ test("25문항, 마킹/복원/OMR 이동/채점/다시 풀기", async ({
   await expect(
     page.getByRole("heading", { name: "25문제 중 6문제 정답" }),
   ).toBeVisible();
-  await expect(page.getByText("해설", { exact: true })).toHaveCount(25);
+  await expect(page.getByText(/\d+\/ \d+점/)).toBeVisible();
   await expect(page.getByRole("radio").first()).toBeDisabled();
   await page
     .getByRole("button", { name: "다시 풀기", exact: true })
@@ -258,9 +258,10 @@ test("API는 빈 답안을 채점하고 잘못된 카테고리를 거부한다",
   await expect(grade.json()).resolves.toMatchObject({
     answeredCount: 0,
     correctCount: 0,
+    maxScore: expect.any(Number),
   });
   const solution = await request.get(
-    "/api/exams/knou-cs/questions/cs-1/solution",
+    `/api/questions/${body.questions[0].id}/solution`,
   );
   expect(solution.ok()).toBe(true);
   await expect(solution.json()).resolves.toMatchObject({ correctAnswer: 1 });
@@ -452,11 +453,16 @@ test("학교 이메일 로그인과 서비스 정책", async ({ page }) => {
   expect(copyrightBox?.y).toBeGreaterThan(footerNavigationBox?.y ?? 0);
   await page.getByRole("button", { name: "서비스 피드백" }).click();
   const feedbackDialog = page.getByRole("dialog");
+  await page.route("**/api/feedbacks", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toEqual({ content: "메뉴 의견" });
+    await route.fulfill({ status: 201, body: "" });
+  });
   await expect(feedbackDialog).toBeVisible();
   await feedbackDialog.getByRole("textbox", { name: "의견" }).fill("메뉴 의견");
-  await feedbackDialog.getByRole("button", { name: "보내기" }).click();
+  await feedbackDialog.getByRole("button", { name: "제출하기" }).click();
   await expect(
-    page.getByText("피드백 전송 기능을 준비 중입니다.", { exact: true }),
+    page.getByText("피드백을 전송했습니다.", { exact: true }),
   ).toBeVisible();
   await feedbackDialog.getByRole("button", { name: "닫기" }).click();
   await expect(feedbackDialog).toBeHidden();

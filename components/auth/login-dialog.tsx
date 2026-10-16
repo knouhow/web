@@ -10,11 +10,16 @@ import {
 } from "@/components/ui/dialog";
 
 interface LoginDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onSignedIn?: () => void;
 }
 
-export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
+export function LoginDialog({
+  open,
+  onOpenChange,
+  onSignedIn,
+}: LoginDialogProps) {
   const router = useRouter();
 
   return (
@@ -24,7 +29,10 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
           <DialogTitle>로그인</DialogTitle>
         </DialogHeader>
         <SchoolEmailLoginForm
-          onSignedIn={() => onOpenChange(false)}
+          onSignedIn={() => {
+            onOpenChange(false);
+            onSignedIn?.();
+          }}
           onSignUp={() => {
             onOpenChange(false);
             router.push("/signup");

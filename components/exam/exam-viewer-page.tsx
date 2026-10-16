@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { LoginDialog } from "@/components/auth/login-dialog";
+import { useAuth } from "@/components/auth/auth-provider";
 import { QuestionCard } from "./question-card";
 import { FloatingIndexBar } from "./floating-index-bar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/toast-provider";
+import { ApiError } from "@/lib/api-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,21 +29,31 @@ import {
   submitExam,
 } from "@/lib/exam/client";
 import type { Answers } from "@/lib/exam/types";
+import { isAnswerForChoiceCount } from "@/lib/exam/types";
 import { useExamStore } from "@/store/exam-store-provider";
 
 const EMPTY_ANSWERS: Answers = {};
 
-export function ExamViewerPage({ examId }: { examId: string }) {
+export function ExamViewerPage({ examId }: Readonly<{ examId: string }>) {
+  const { user: authUser, hydrated: authHydrated } = useAuth();
   const hydrated = useExamStore((state) => state.hydrated);
   const storageError = useExamStore((state) => state.storageError);
   const session = useExamStore((state) => state.sessions[examId]);
   const setResult = useExamStore((state) => state.setResult);
   const resetExam = useExamStore((state) => state.resetExam);
+  const markAnswer = useExamStore((state) => state.markAnswer);
+  const clearAnswer = useExamStore((state) => state.clearAnswer);
   const { error: showError, success } = useToast();
   const answers = session?.answers ?? EMPTY_ANSWERS;
   const result = session?.result;
   const [activeQuestionId, setActiveQuestionId] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [pendingGradeAnswers, setPendingGradeAnswers] =
+    useState<Answers | null>(null);
+  const [solutionLockedIds, setSolutionLockedIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const resultRef = useRef<HTMLDivElement>(null);
   const appliedExplanationResultRef = useRef<typeof result>(undefined);
 
@@ -58,7 +71,17 @@ export function ExamViewerPage({ examId }: { examId: string }) {
       setResult(examId, data);
       success({ title: "채점이 완료되었습니다." });
     },
-    onError: (mutationError) => {
+    onError: (mutationError, snapshot) => {
+      if (
+        exam?.kind === "university" &&
+        mutationError instanceof ApiError &&
+        mutationError.status === 401 &&
+        mutationError.code === "AUTH_001"
+      ) {
+        setPendingGradeAnswers({ ...snapshot });
+        setLoginOpen(true);
+        return;
+      }
       showError({
         title: "채점하지 못했습니다.",
         description: mutationError.message,
@@ -66,10 +89,10 @@ export function ExamViewerPage({ examId }: { examId: string }) {
     },
   });
   const pendingExplanationQuery = useQuery({
-    queryKey: ["exam-explanations", examId, JSON.stringify(answers)],
+    queryKey: ["exam-explanations", examId, result],
     queryFn: ({ signal }) => {
       if (!exam || !result) throw new Error("채점 결과를 불러오지 못했습니다.");
-      return refreshPendingExplanations(exam, answers, result, signal);
+      return refreshPendingExplanations(exam, result, signal);
     },
     enabled: Boolean(
       exam &&
@@ -109,10 +132,9 @@ export function ExamViewerPage({ examId }: { examId: string }) {
             Math.abs(a.getBoundingClientRect().top - 96) -
             Math.abs(b.getBoundingClientRect().top - 96),
         )[0];
-        if (nearest)
+        if (nearest instanceof HTMLElement)
           setActiveQuestionId(
-            nearest.getAttribute("data-question-id") ??
-              String(exam.questions[0]?.id ?? ""),
+            nearest.dataset.questionId ?? String(exam.questions[0]?.id ?? ""),
           );
       },
       { rootMargin: "-88px 0px -40% 0px", threshold: [0, 0.25, 0.5] },
@@ -150,27 +172,45 @@ export function ExamViewerPage({ examId }: { examId: string }) {
               type="button"
               variant="link"
               className="mt-3 h-auto p-0"
-              onClick={() => void examQuery.refetch()}
+              onClick={async () => {
+                await examQuery.refetch();
+              }}
             >
               다시 시도
             </Button>
           </div>
         ) : (
-          <p role="status" className="text-sm text-muted-foreground">
+          <output aria-live="polite" className="block text-sm text-muted-foreground">
             시험을 불러오는 중입니다.
-          </p>
+          </output>
         )}
       </main>
     );
   }
 
   function handleSubmit() {
-    if (!hydrated || grade.isPending) return;
-    grade.mutate({ ...answers });
+    if (!exam || !hydrated || grade.isPending) return;
+    const snapshot = { ...answers };
+    if (exam.kind === "university" && authHydrated && !authUser) {
+      setPendingGradeAnswers(snapshot);
+      setLoginOpen(true);
+      return;
+    }
+    grade.mutate(snapshot);
   }
 
-  const answeredCount = exam.questions.filter(
-    (question) => answers[String(question.id)] !== undefined,
+  function continueGradeAfterLogin() {
+    if (!pendingGradeAnswers || grade.isPending) return;
+    const snapshot = { ...pendingGradeAnswers };
+    setPendingGradeAnswers(null);
+    grade.mutate(snapshot);
+  }
+
+  const answeredCount = exam.questions.filter((question) =>
+    isAnswerForChoiceCount(
+      answers[String(question.id)],
+      question.choices.length,
+    ),
   ).length;
   const subjectCatalogHref = exam.subjectCode
     ? `/#subject-${encodeURIComponent(exam.subjectCode)}`
@@ -188,17 +228,14 @@ export function ExamViewerPage({ examId }: { examId: string }) {
         </Link>
         <ChevronRight className="size-3" />
         {exam.kind === "university" ? (
-          <>
-            <span>{exam.title}</span>
-            <span>{exam.examYear}년 기출문제</span>
-          </>
+          <span>{`${exam.title} · ${exam.examYear}년 기출문제`}</span>
         ) : (
           <span>{exam.title}</span>
         )}
       </div>
-      <div role="status" aria-live="polite" className="sr-only">
+      <output aria-live="polite" className="sr-only">
         문제 {answeredCount}개 / 전체 {exam.questions.length}문제
-      </div>
+      </output>
       <Link
         href={backHref}
         className="mb-6 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
@@ -215,35 +252,41 @@ export function ExamViewerPage({ examId }: { examId: string }) {
         </p>
       )}
       {result && (
-        <div
+        <section
           ref={resultRef}
           tabIndex={-1}
-          role="status"
+          aria-live="polite"
           className="mb-6 scroll-mt-24 rounded-2xl bg-primary px-6 py-6 text-white outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-bold">
               {result.answeredCount}문제 중 {result.correctCount}문제 정답
             </h2>
-            <p className="font-mono text-4xl font-semibold">
-              {result.score}
-              <span className="ml-1 text-sm">점</span>
-            </p>
+            <output className="flex items-baseline gap-1 font-mono text-4xl font-semibold">
+              <span>{result.score}</span>
+              <span className="text-sm">/ {result.maxScore}점</span>
+            </output>
           </div>
-        </div>
+        </section>
       )}
 
       <div className="space-y-5">
         {exam.questions.map((question, index) => (
           <QuestionCard
             key={question.id}
-            exam={exam}
             examId={examId}
             question={question}
             number={index + 1}
-            answers={answers}
             result={result?.questions[String(question.id)]}
             disabled={!hydrated || grade.isPending}
+            onSolutionOpenChange={(questionId, open) =>
+              setSolutionLockedIds((current) => {
+                const next = new Set(current);
+                if (open) next.add(questionId);
+                else next.delete(questionId);
+                return next;
+              })
+            }
           />
         ))}
       </div>
@@ -255,6 +298,12 @@ export function ExamViewerPage({ examId }: { examId: string }) {
           activeQuestionId || String(exam.questions[0]?.id ?? "")
         }
         result={result}
+        lockedQuestionIds={solutionLockedIds}
+        onAnswerChange={(questionId, answer) =>
+          answer === null
+            ? clearAnswer(examId, String(questionId))
+            : markAnswer(examId, String(questionId), answer)
+        }
         isPending={grade.isPending}
         disabled={!hydrated}
         onSubmit={handleSubmit}
@@ -274,6 +323,7 @@ export function ExamViewerPage({ examId }: { examId: string }) {
             <AlertDialogAction
               onClick={() => {
                 resetExam(examId);
+                setSolutionLockedIds(new Set());
                 grade.reset();
                 scrollToQuestion(exam.questions[0].id);
               }}
@@ -283,6 +333,11 @@ export function ExamViewerPage({ examId }: { examId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <LoginDialog
+        open={loginOpen}
+        onOpenChange={setLoginOpen}
+        onSignedIn={continueGradeAfterLogin}
+      />
     </main>
   );
 }

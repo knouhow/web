@@ -32,7 +32,16 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export type AnswerIndex = 0 | 1 | 2 | 3;
-export type Choices = readonly [string, string, string, string];
+export type QuestionType = "MULTIPLE_CHOICE" | "TRUE_FALSE";
+export const QUESTION_REPORT_TYPES = [
+  { value: "WRONG_ANSWER", label: "정답 오류" },
+  { value: "WRONG_EXPLANATION", label: "해설 오류" },
+  { value: "BROKEN_CONTENT", label: "문항 깨짐" },
+  { value: "OTHER", label: "기타" },
+] as const;
+export type QuestionReportType =
+  (typeof QUESTION_REPORT_TYPES)[number]["value"];
+export type Choices = readonly string[];
 export type Answers = Record<string, AnswerIndex>;
 export type Term =
   "FIRST_SEMESTER" | "SECOND_SEMESTER" | "SUMMER_SESSION" | "WINTER_SESSION";
@@ -43,8 +52,30 @@ export interface Question {
   id: number;
   number: number | null;
   category: CategoryId | null;
+  type: QuestionType;
   text: string;
   choices: Choices;
+  images: QuestionImage[];
+  tables: QuestionTable[];
+}
+
+export interface QuestionImage {
+  seq: number;
+  url: string;
+  width: number;
+  height: number;
+  alt: string | null;
+}
+
+export interface QuestionTableCell {
+  text: string;
+  rowSpan: number;
+  colSpan: number;
+}
+
+export interface QuestionTable {
+  seq: number;
+  rows: QuestionTableCell[][];
 }
 
 export interface Exam {
@@ -76,6 +107,7 @@ export interface GradeResult {
   answeredCount: number;
   total: number;
   score: number;
+  maxScore: number;
   questions: Record<string, QuestionResult>;
 }
 
@@ -105,17 +137,20 @@ export interface ExamApiResponse {
 }
 
 export interface GradeApiQuestion {
-  selectedAnswer: AnswerIndex;
+  selectedAnswer: AnswerIndex | null;
   correctAnswer: AnswerIndex;
   isCorrect: boolean;
   explanation: string | null;
   explanationStatus: ExplanationStatus;
+  choiceExplanations: Choices | null;
 }
 
 export interface GradeApiResponse {
   correctCount: number;
+  answeredCount: number;
   total: number;
   score: number;
+  maxScore: number;
   questions: Record<string, GradeApiQuestion>;
 }
 
@@ -130,4 +165,11 @@ export function isCategory(value: unknown): value is CategoryId {
 
 export function isAnswer(value: unknown): value is AnswerIndex {
   return value === 0 || value === 1 || value === 2 || value === 3;
+}
+
+export function isAnswerForChoiceCount(
+  value: unknown,
+  choiceCount: number,
+): value is AnswerIndex {
+  return isAnswer(value) && value < choiceCount;
 }

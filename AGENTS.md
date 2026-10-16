@@ -8,9 +8,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# KNOUHow Web instructions for Codex
+# KNOUHow Web repository instructions
 
-Before working in this repository, read and follow `web-config/ai/AGENTS.md`. Codex does not treat a Claude-style `@path` line as an automatic import, so open that file explicitly. If it is missing, initialize the configured submodule from the repository root:
+Before any work in this repository, read `web-config/ai/AGENTS.md` and `web-config/ai/PROJECT-HANDOFF.md`. These are the shared frontend rules and current project handoff for human contributors and AI coding tools. If `web-config` is missing, initialize the configured submodule from the repository root:
 
 ```powershell
 git -c submodule.web-config.update=checkout submodule update --init web-config

@@ -7,6 +7,7 @@ const EMPTY_GRADE_RESULT: GradeResult = {
   answeredCount: 0,
   total: 25,
   score: 0,
+  maxScore: 100,
   questions: {},
 };
 
