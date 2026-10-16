@@ -90,9 +90,7 @@ function subscribePendingSignUpEmail(onChange: () => void) {
     window.removeEventListener(PENDING_SIGN_UP_EMAIL_EVENT, onChange);
 }
 
-export function AuthProvider({
-  children,
-}: Readonly<{ children: ReactNode }>) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const pendingSignUpEmail = useSyncExternalStore(

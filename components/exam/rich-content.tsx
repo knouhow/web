@@ -265,16 +265,12 @@ export function RichContent({
 
   while ((match = contentToken.exec(content)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(renderText(content.slice(lastIndex, match.index), keyOccurrences));
+      parts.push(
+        renderText(content.slice(lastIndex, match.index), keyOccurrences),
+      );
     }
     parts.push(
-      renderContentToken(
-        match,
-        imageBySeq,
-        tableBySeq,
-        images,
-        keyOccurrences,
-      ),
+      renderContentToken(match, imageBySeq, tableBySeq, images, keyOccurrences),
     );
     lastIndex = contentToken.lastIndex;
   }

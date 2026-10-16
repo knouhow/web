@@ -153,8 +153,9 @@ export function FloatingIndexBar({
                   const selected = answered && answer === choiceIndex;
                   const occurrence = question.choices
                     .slice(0, choiceIndex)
-                    .filter((previousChoice) => previousChoice === choice)
-                    .length;
+                    .filter(
+                      (previousChoice) => previousChoice === choice,
+                    ).length;
                   const label =
                     question.type === "TRUE_FALSE"
                       ? choice
@@ -204,10 +205,7 @@ export function FloatingIndexBar({
           <span>안 푼 문제</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span
-            aria-hidden="true"
-            className="size-2.5 rounded-sm bg-primary"
-          />
+          <span aria-hidden="true" className="size-2.5 rounded-sm bg-primary" />
           <span>푼 문제</span>
         </span>
         {result && (

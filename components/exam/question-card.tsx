@@ -33,7 +33,9 @@ import { RichContent } from "./rich-content";
 
 const numerals = ["①", "②", "③", "④"] as const;
 
-function getExplanationMessage(status: QuestionResult["explanationStatus"] | undefined) {
+function getExplanationMessage(
+  status: QuestionResult["explanationStatus"] | undefined,
+) {
   if (status === "FAILED") return "해설을 불러오지 못했습니다.";
   if (status === "REQUESTED" || status === "GENERATING")
     return "해설을 준비하고 있습니다.";
@@ -159,10 +161,7 @@ function QuestionChoices({
                   onAnswerChange(question.id, null);
                 }}
                 onChange={() =>
-                  onAnswerChange(
-                    question.id,
-                    index as AnswerIndex,
-                  )
+                  onAnswerChange(question.id, index as AnswerIndex)
                 }
               />
               <label
@@ -353,17 +352,15 @@ interface QuestionReportDialogProps {
   readonly number: number;
 }
 
-function QuestionReportDialog({
-  question,
-  number,
-}: QuestionReportDialogProps) {
+function QuestionReportDialog({ question, number }: QuestionReportDialogProps) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<QuestionReportType | null>(null);
   const [content, setContent] = useState("");
   const { error: showError, success } = useToast();
   const reportMutation = useMutation({
-    mutationFn: (report: Readonly<{ type: QuestionReportType; content: string }>) =>
-      submitQuestionReport(question.id, report.type, report.content),
+    mutationFn: (
+      report: Readonly<{ type: QuestionReportType; content: string }>,
+    ) => submitQuestionReport(question.id, report.type, report.content),
     onSuccess: () => {
       setOpen(false);
       setType(null);
@@ -452,7 +449,9 @@ function QuestionReportDialog({
                 className="flex items-center gap-1 text-sm font-semibold"
               >
                 <span>설명</span>
-                <span className="font-normal text-muted-foreground">(선택)</span>
+                <span className="font-normal text-muted-foreground">
+                  (선택)
+                </span>
               </label>
               <textarea
                 id={`question-report-content-${question.id}`}
@@ -477,7 +476,10 @@ function QuestionReportDialog({
               >
                 취소
               </Button>
-              <Button type="submit" disabled={!type || reportMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={!type || reportMutation.isPending}
+              >
                 {reportMutation.isPending ? "접수 중" : "신고하기"}
               </Button>
             </div>
@@ -494,10 +496,7 @@ interface QuestionCardProps {
   readonly number: number;
   readonly result?: QuestionResult;
   readonly disabled?: boolean;
-  readonly onSolutionOpenChange?: (
-    questionId: number,
-    open: boolean,
-  ) => void;
+  readonly onSolutionOpenChange?: (questionId: number, open: boolean) => void;
 }
 
 export function QuestionCard({
@@ -595,7 +594,11 @@ export function QuestionCard({
           examId={examId}
           question={question}
           number={number}
-          answer={isAnswerForChoiceCount(answer, question.choices.length) ? answer : undefined}
+          answer={
+            isAnswerForChoiceCount(answer, question.choices.length)
+              ? answer
+              : undefined
+          }
           solutionVisible={solutionVisible}
           correctAnswer={solution?.correctAnswer}
           disabled={Boolean(disabled)}
@@ -612,7 +615,9 @@ export function QuestionCard({
         visible={solutionVisible}
         solution={solution}
         isFetching={solutionQuery.isFetching}
-        errorMessage={solutionQuery.isError ? solutionQuery.error.message : undefined}
+        errorMessage={
+          solutionQuery.isError ? solutionQuery.error.message : undefined
+        }
         showRetry={solution?.explanationStatus === "FAILED" && !result}
         retrying={retryingExplanation}
         retryError={retryExplanationError}

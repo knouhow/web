@@ -1,8 +1,6 @@
 "use client";
 
-export default function ErrorPage({
-  reset,
-}: Readonly<{ reset: () => void }>) {
+export default function ErrorPage({ reset }: Readonly<{ reset: () => void }>) {
   return (
     <main id="main-content" className="mx-auto max-w-lg px-6 py-28 text-center">
       <h1 className="text-2xl font-bold">화면을 불러오지 못했어요.</h1>

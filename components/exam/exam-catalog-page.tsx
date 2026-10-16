@@ -175,9 +175,7 @@ function SubjectExamLinks({
   );
 }
 
-function SubjectItem({
-  subject,
-}: Readonly<{ subject: SubjectCatalogItem }>) {
+function SubjectItem({ subject }: Readonly<{ subject: SubjectCatalogItem }>) {
   return (
     <li>
       <details
@@ -185,9 +183,7 @@ function SubjectItem({
         className="group rounded-2xl border border-border bg-card"
         onToggle={(event) => {
           const url = new URL(window.location.href);
-          url.hash = event.currentTarget.open
-            ? `#subject-${subject.code}`
-            : "";
+          url.hash = event.currentTarget.open ? `#subject-${subject.code}` : "";
           window.history.replaceState(
             window.history.state,
             "",

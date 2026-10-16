@@ -180,7 +180,10 @@ export function ExamViewerPage({ examId }: Readonly<{ examId: string }>) {
             </Button>
           </div>
         ) : (
-          <output aria-live="polite" className="block text-sm text-muted-foreground">
+          <output
+            aria-live="polite"
+            className="block text-sm text-muted-foreground"
+          >
             시험을 불러오는 중입니다.
           </output>
         )}
