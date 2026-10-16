@@ -31,7 +31,9 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-export function AppToastProvider({ children }: { children: ReactNode }) {
+export function AppToastProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);
 

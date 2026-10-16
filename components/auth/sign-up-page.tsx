@@ -46,7 +46,7 @@ export function SignUpPage() {
           event.preventDefault();
           if (!valid) return;
           setIsSubmitting(true);
-          void register(name, termsAgreed, privacyAgreed)
+          register(name, termsAgreed, privacyAgreed)
             .then(() => {
               success({ title: "회원가입이 완료되었습니다." });
               router.replace("/mypage");

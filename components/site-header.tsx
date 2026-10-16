@@ -19,20 +19,20 @@ import {
 import { cn } from "@/lib/utils";
 
 interface HeaderUser {
-  nickname: string;
+  readonly nickname: string;
 }
 
 interface SiteHeaderProps {
-  user?: HeaderUser;
+  readonly user?: HeaderUser;
 }
 
 function AccountMenu({
   user,
   onSignOut,
-}: {
+}: Readonly<{
   user: HeaderUser;
   onSignOut: () => void;
-}) {
+}>) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -87,7 +87,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
   const headerUser = user ?? authenticatedUser;
 
   function handleSignOut() {
-    void signOut()
+    signOut()
       .then(() => router.replace("/"))
       .catch((signOutError: unknown) => {
         showError({

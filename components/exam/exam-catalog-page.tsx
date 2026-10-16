@@ -1,6 +1,12 @@
 ﻿"use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -106,6 +112,242 @@ const LOCAL_MOCK_SUBJECTS: readonly SubjectCatalogItem[] = [
   },
 ];
 
+function openSubjectFromHash(subjects: readonly SubjectCatalogItem[]) {
+  const prefix = "#subject-";
+  if (!window.location.hash.startsWith(prefix)) return;
+  const subjectId = decodeURIComponent(
+    window.location.hash.slice(prefix.length),
+  );
+  if (!subjects.some((subject) => subject.code === subjectId)) return;
+  const target = document.querySelector<HTMLDetailsElement>(
+    `#subject-${subjectId}`,
+  );
+  if (!target) return;
+  target.open = true;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "instant", block: "center" });
+    target.querySelector("summary")?.focus({ preventScroll: true });
+  });
+}
+
+function preserveCatalogHash(event: MouseEvent<HTMLAnchorElement>) {
+  if (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return;
+  window.history.pushState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}${window.location.hash}`,
+  );
+}
+
+function SubjectExamLinks({
+  subject,
+}: Readonly<{ subject: SubjectCatalogItem }>) {
+  if (subject.pastExams.length === 0)
+    return (
+      <p className="border-t border-border px-5 py-3 text-sm text-muted-foreground">
+        등록된 기출문제가 없습니다.
+      </p>
+    );
+
+  return (
+    <div className="border-t border-border px-5 py-3">
+      <ul aria-label={`${subject.title} 연도별 기출문제`}>
+        {subject.pastExams.map((pastExam) => (
+          <li key={pastExam.examId}>
+            <a
+              href={`/exam/${pastExam.examId}`}
+              onClick={preserveCatalogHash}
+              className="block rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {pastExam.examYear}년 {pastExam.termLabel}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SubjectItem({
+  subject,
+}: Readonly<{ subject: SubjectCatalogItem }>) {
+  return (
+    <li>
+      <details
+        id={`subject-${subject.code}`}
+        className="group rounded-2xl border border-border bg-card"
+        onToggle={(event) => {
+          const url = new URL(window.location.href);
+          url.hash = event.currentTarget.open
+            ? `#subject-${subject.code}`
+            : "";
+          window.history.replaceState(
+            window.history.state,
+            "",
+            `${url.pathname}${url.search}${url.hash}`,
+          );
+        }}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-5 text-left font-bold outline-none transition-colors hover:bg-primary/[0.025] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+          {subject.title}
+          <ChevronDown
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <SubjectExamLinks subject={subject} />
+      </details>
+    </li>
+  );
+}
+
+interface SubjectPaginationProps {
+  readonly totalPages: number;
+  readonly currentPage: number;
+  readonly onPageChange: (page: number) => void;
+}
+
+function SubjectPagination({
+  totalPages,
+  currentPage,
+  onPageChange,
+}: SubjectPaginationProps) {
+  if (totalPages <= 1) return null;
+  return (
+    <nav
+      aria-label="과목 목록 페이지"
+      className="mt-6 flex items-center justify-center gap-1"
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="이전 페이지"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(currentPage - 1)}
+      >
+        이전
+      </Button>
+      {Array.from({ length: totalPages }, (_, index) => {
+        const pageNumber = index + 1;
+        const isCurrentPage = pageNumber === currentPage;
+        return (
+          <Button
+            key={pageNumber}
+            type="button"
+            variant={isCurrentPage ? "secondary" : "outline"}
+            size="sm"
+            aria-label={`${pageNumber}페이지`}
+            aria-current={isCurrentPage ? "page" : undefined}
+            onClick={() => onPageChange(pageNumber)}
+          >
+            {pageNumber}
+          </Button>
+        );
+      })}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="다음 페이지"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+      >
+        다음
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="맨 끝 페이지"
+        disabled={currentPage === totalPages}
+        onClick={() => onPageChange(totalPages)}
+      >
+        맨 끝
+      </Button>
+    </nav>
+  );
+}
+
+interface SubjectResultsProps {
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly subjects: readonly SubjectCatalogItem[];
+  readonly searchTerm: string;
+  readonly totalPages: number;
+  readonly currentPage: number;
+  readonly onPageChange: (page: number) => void;
+  readonly onRetry: () => void;
+}
+
+function SubjectResults({
+  isPending,
+  isError,
+  subjects,
+  searchTerm,
+  totalPages,
+  currentPage,
+  onPageChange,
+  onRetry,
+}: SubjectResultsProps) {
+  if (isPending)
+    return (
+      <output
+        aria-live="polite"
+        className="mt-4 block text-sm text-muted-foreground"
+      >
+        과목 목록을 불러오는 중입니다.
+      </output>
+    );
+  if (isError)
+    return (
+      <div
+        role="alert"
+        className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm"
+      >
+        <p>과목 목록을 불러오지 못했습니다.</p>
+        <Button
+          type="button"
+          variant="link"
+          className="mt-1 h-auto p-0"
+          onClick={onRetry}
+        >
+          다시 시도
+        </Button>
+      </div>
+    );
+  if (subjects.length === 0)
+    return (
+      <div className="mt-4 rounded-2xl border border-dashed border-border bg-card px-5 py-10 text-center">
+        <p className="font-semibold">
+          {searchTerm ? "검색 결과가 없습니다." : "등록된 과목이 없습니다."}
+        </p>
+      </div>
+    );
+
+  return (
+    <>
+      <ul className="mt-4 grid gap-3">
+        {subjects.map((subject) => (
+          <SubjectItem key={subject.code} subject={subject} />
+        ))}
+      </ul>
+      <SubjectPagination
+        totalPages={totalPages}
+        currentPage={currentPage}
+        onPageChange={onPageChange}
+      />
+    </>
+  );
+}
+
 export function ExamCatalogPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -145,21 +387,7 @@ export function ExamCatalogPage() {
   );
 
   useEffect(() => {
-    const prefix = "#subject-";
-    if (!window.location.hash.startsWith(prefix)) return;
-    const subjectId = decodeURIComponent(
-      window.location.hash.slice(prefix.length),
-    );
-    if (!catalogSubjects.some((subject) => subject.code === subjectId)) return;
-    const target = document.querySelector<HTMLDetailsElement>(
-      `#subject-${subjectId}`,
-    );
-    if (!target) return;
-    target.open = true;
-    window.requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: "instant", block: "center" });
-      target.querySelector("summary")?.focus({ preventScroll: true });
-    });
+    openSubjectFromHash(catalogSubjects);
   }, [catalogSubjects]);
 
   return (
@@ -211,159 +439,18 @@ export function ExamCatalogPage() {
           </h2>
         </div>
 
-        {subjectsQuery.isPending ? (
-          <p role="status" className="mt-4 text-sm text-muted-foreground">
-            과목 목록을 불러오는 중입니다.
-          </p>
-        ) : subjectsQuery.isError ? (
-          <div
-            role="alert"
-            className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm"
-          >
-            <p>과목 목록을 불러오지 못했습니다.</p>
-            <Button
-              type="button"
-              variant="link"
-              className="mt-1 h-auto p-0"
-              onClick={() => void subjectsQuery.refetch()}
-            >
-              다시 시도
-            </Button>
-          </div>
-        ) : filteredSubjects.length ? (
-          <>
-            <ul className="mt-4 grid gap-3">
-              {pagedSubjects.map((subject) => (
-                <li key={subject.code}>
-                  <details
-                    id={`subject-${subject.code}`}
-                    className="group rounded-2xl border border-border bg-card"
-                    onToggle={(event) => {
-                      const url = new URL(window.location.href);
-                      url.hash = event.currentTarget.open
-                        ? `#subject-${subject.code}`
-                        : "";
-                      window.history.replaceState(
-                        window.history.state,
-                        "",
-                        `${url.pathname}${url.search}${url.hash}`,
-                      );
-                    }}
-                  >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-5 text-left font-bold outline-none transition-colors hover:bg-primary/[0.025] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
-                      {subject.title}
-                      <ChevronDown
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-                      />
-                    </summary>
-                    {subject.pastExams.length ? (
-                      <div className="border-t border-border px-5 py-3">
-                        <ul aria-label={`${subject.title} 연도별 기출문제`}>
-                          {subject.pastExams.map((pastExam) => (
-                            <li key={pastExam.examId}>
-                              <a
-                                href={`/exam/${pastExam.examId}`}
-                                onClick={(event) => {
-                                  if (
-                                    event.button !== 0 ||
-                                    event.metaKey ||
-                                    event.ctrlKey ||
-                                    event.shiftKey ||
-                                    event.altKey
-                                  )
-                                    return;
-                                  window.history.pushState(
-                                    window.history.state,
-                                    "",
-                                    `${window.location.pathname}${window.location.search}${window.location.hash}`,
-                                  );
-                                }}
-                                className="block rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary"
-                              >
-                                {pastExam.examYear}년 {pastExam.termLabel}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <p className="border-t border-border px-5 py-3 text-sm text-muted-foreground">
-                        등록된 기출문제가 없습니다.
-                      </p>
-                    )}
-                  </details>
-                </li>
-              ))}
-            </ul>
-
-            {totalPages > 1 && (
-              <nav
-                aria-label="과목 목록 페이지"
-                className="mt-6 flex items-center justify-center gap-1"
-              >
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-label="이전 페이지"
-                  disabled={currentPage === 1}
-                  onClick={() => setPage((current) => current - 1)}
-                >
-                  이전
-                </Button>
-                {Array.from({ length: totalPages }, (_, index) => {
-                  const pageNumber = index + 1;
-                  return (
-                    <Button
-                      key={pageNumber}
-                      type="button"
-                      variant={
-                        pageNumber === currentPage ? "secondary" : "outline"
-                      }
-                      size="sm"
-                      aria-label={`${pageNumber}페이지`}
-                      aria-current={
-                        pageNumber === currentPage ? "page" : undefined
-                      }
-                      onClick={() => setPage(pageNumber)}
-                    >
-                      {pageNumber}
-                    </Button>
-                  );
-                })}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-label="다음 페이지"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  다음
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-label="맨 끝 페이지"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setPage(totalPages)}
-                >
-                  맨 끝
-                </Button>
-              </nav>
-            )}
-          </>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-border bg-card px-5 py-10 text-center">
-            <p className="font-semibold">
-              {normalizedQuery
-                ? "검색 결과가 없습니다."
-                : "등록된 과목이 없습니다."}
-            </p>
-          </div>
-        )}
+        <SubjectResults
+          isPending={subjectsQuery.isPending}
+          isError={subjectsQuery.isError}
+          subjects={pagedSubjects}
+          searchTerm={normalizedQuery}
+          totalPages={totalPages}
+          currentPage={currentPage}
+          onPageChange={setPage}
+          onRetry={async () => {
+            await subjectsQuery.refetch();
+          }}
+        />
       </section>
     </main>
   );

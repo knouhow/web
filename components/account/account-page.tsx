@@ -24,10 +24,10 @@ import { Input } from "@/components/ui/input";
 type AccountPageKind = "mypage" | "settings";
 
 interface AccountPageProps {
-  kind: AccountPageKind;
+  readonly kind: AccountPageKind;
 }
 
-function MyProfile({ user }: { user: AuthUser }) {
+function MyProfile({ user }: Readonly<{ user: AuthUser }>) {
   const { updateNickname } = useAuth();
   const { error: showError, success } = useToast();
   const [editing, setEditing] = useState(false);
@@ -57,7 +57,7 @@ function MyProfile({ user }: { user: AuthUser }) {
             event.preventDefault();
             if (!nickname.trim()) return;
             setIsSaving(true);
-            void updateNickname(nickname)
+            updateNickname(nickname)
               .then(() => {
                 success({ title: "닉네임을 수정했습니다." });
                 setEditing(false);
@@ -116,7 +116,7 @@ function MyProfile({ user }: { user: AuthUser }) {
   );
 }
 
-function AccountSettings({ user }: { user: AuthUser }) {
+function AccountSettings({ user }: Readonly<{ user: AuthUser }>) {
   const router = useRouter();
   const { updateName, withdraw } = useAuth();
   const { error: showError, success } = useToast();
@@ -146,7 +146,7 @@ function AccountSettings({ user }: { user: AuthUser }) {
                 event.preventDefault();
                 if (!name.trim()) return;
                 setIsSaving(true);
-                void updateName(name)
+                updateName(name)
                   .then(() => success({ title: "이름을 수정했습니다." }))
                   .catch((saveError: unknown) => {
                     showError({
@@ -195,7 +195,7 @@ function AccountSettings({ user }: { user: AuthUser }) {
               disabled={isWithdrawing}
               onClick={() => {
                 setIsWithdrawing(true);
-                void withdraw()
+                withdraw()
                   .then(() => {
                     success({ title: "회원 탈퇴가 완료되었습니다." });
                     router.replace("/");

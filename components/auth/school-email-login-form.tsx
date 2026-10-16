@@ -31,10 +31,10 @@ function isVerificationCode(value: string) {
 export function SchoolEmailLoginForm({
   onSignedIn,
   onSignUp,
-}: {
-  onSignedIn: () => void;
-  onSignUp: () => void;
-}) {
+}: Readonly<{
+  readonly onSignedIn: () => void;
+  readonly onSignUp: () => void;
+}>) {
   const [step, setStep] = useState<LoginStep>("email");
   const [localPart, setLocalPart] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -131,9 +131,9 @@ export function SchoolEmailLoginForm({
     return (
       <form
         className="space-y-4"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          void verifyCode();
+          await verifyCode();
         }}
       >
         <div className="space-y-2">
@@ -188,7 +188,9 @@ export function SchoolEmailLoginForm({
             type="button"
             variant="outline"
             disabled={isPending || resendSeconds > 0}
-            onClick={() => void requestCode()}
+            onClick={async () => {
+              await requestCode();
+            }}
           >
             {resendSeconds > 0 ? `재전송 ${resendSeconds}초` : "재전송"}
           </Button>
@@ -213,9 +215,9 @@ export function SchoolEmailLoginForm({
   return (
     <form
       className="space-y-4"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        void requestCode();
+        await requestCode();
       }}
     >
       <div className="space-y-2">

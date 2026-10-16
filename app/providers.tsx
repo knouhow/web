@@ -6,7 +6,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { AppToastProvider } from "@/components/toast-provider";
 import { ExamStoreProvider } from "@/store/exam-store-provider";
 
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({ children }: Readonly<{ children: ReactNode }>) {
   const [queryClient] = useState(
     () =>
       new QueryClient({

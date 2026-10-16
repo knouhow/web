@@ -10,14 +10,53 @@ export class ApiError extends Error {
 }
 
 function apiBaseUrl() {
-  const value = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  let value = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (!value)
     throw new Error("NEXT_PUBLIC_API_BASE_URL이 설정되지 않았습니다.");
-  return value.replace(/\/+$/, "");
+  while (value.endsWith("/")) value = value.slice(0, -1);
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function isRecordValue(
+  value: unknown,
+): value is Record<string, unknown> {
+  return isRecord(value);
+}
+
+function createResponseError(response: Response, body: unknown) {
+  const message =
+    isRecord(body) && typeof body.message === "string"
+      ? body.message
+      : "요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+  const code =
+    isRecord(body) && typeof body.code === "string" ? body.code : undefined;
+  return new ApiError(message, response.status, code);
+}
+
+async function readResponseBody(response: Response) {
+  if (response.status === 204) {
+    if (!response.ok)
+      throw new ApiError("요청에 실패했습니다.", response.status);
+    return null;
+  }
+
+  const text = await response.text();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    if (response.ok)
+      throw new ApiError(
+        "서버 응답 형식이 올바르지 않습니다.",
+        response.status,
+      );
+    return null;
+  }
 }
 
 export async function apiRequest(path: string, init: RequestInit = {}) {
@@ -39,40 +78,7 @@ export async function apiRequest(path: string, init: RequestInit = {}) {
     );
   }
 
-  if (response.status === 204) {
-    if (!response.ok)
-      throw new ApiError("요청에 실패했습니다.", response.status);
-    return null;
-  }
-
-  const text = await response.text();
-  let body: unknown = null;
-  if (text) {
-    try {
-      body = JSON.parse(text) as unknown;
-    } catch {
-      if (response.ok)
-        throw new ApiError(
-          "서버 응답 형식이 올바르지 않습니다.",
-          response.status,
-        );
-    }
-  }
-
-  if (!response.ok) {
-    const message =
-      isRecord(body) && typeof body.message === "string"
-        ? body.message
-        : "요청에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    const code =
-      isRecord(body) && typeof body.code === "string" ? body.code : undefined;
-    throw new ApiError(message, response.status, code);
-  }
+  const body = await readResponseBody(response);
+  if (!response.ok) throw createResponseError(response, body);
   return body;
-}
-
-export function isRecordValue(
-  value: unknown,
-): value is Record<string, unknown> {
-  return isRecord(value);
 }

@@ -8,10 +8,10 @@ import type { CategoryId } from "@/lib/exam/types";
 export function RandomMixButton({
   isPending,
   onGenerate,
-}: {
-  isPending: boolean;
-  onGenerate: (categories: CategoryId[]) => void;
-}) {
+}: Readonly<{
+  readonly isPending: boolean;
+  readonly onGenerate: (categories: CategoryId[]) => void;
+}>) {
   const selected = useExamStore((state) => state.selectedCategories);
   const hydrated = useExamStore((state) => state.hydrated);
   return (

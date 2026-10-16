@@ -9,10 +9,10 @@ const toastVariants = ["success", "error", "info"] as const;
 type ToastVariant = (typeof toastVariants)[number];
 
 interface ToastProps {
-  variant: ToastVariant;
-  title: string;
-  description?: string;
-  onOpenChange: (open: boolean) => void;
+  readonly variant: ToastVariant;
+  readonly title: string;
+  readonly description?: string;
+  readonly onOpenChange: (open: boolean) => void;
 }
 
 const variantStyles: Record<

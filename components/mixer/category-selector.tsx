@@ -5,7 +5,9 @@ import { CATEGORIES } from "@/lib/exam/types";
 import { useExamStore } from "@/store/exam-store-provider";
 import { cn } from "@/lib/utils";
 
-export function CategorySelector({ disabled = false }: { disabled?: boolean }) {
+export function CategorySelector({
+  disabled = false,
+}: Readonly<{ disabled?: boolean }>) {
   const selected = useExamStore((state) => state.selectedCategories);
   const toggle = useExamStore((state) => state.toggleCategory);
   const hydrated = useExamStore((state) => state.hydrated);
